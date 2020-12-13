@@ -24,20 +24,21 @@ print(device)
 
 # Define the environment
 # gym.envs.register(
-#     id='highway-v0',
+#     id='intersection-v0',
 #     entry_point='highway_env.envs:HighwayEnv',
 # )
 
-env = gym.make("highway-v0")
-#print(env.action_space)
-#pprint.pprint(env.config)
-env.config["lanes_count"] = 4
-env.config["duration"] = 100
-env.config["vehicles_count"] = 10
-env.config["vehicles_density"] = 1.3
-env.config["policy_frequency"] = 2
-env.config["simulation_frequency"] = 10
-env.reset()
+env = gym.make("intersection-v0")
+print(env.action_space)
+pprint.pprint(env.config)
+
+# env.config["lanes_count"] = 4
+# env.config["duration"] = 100
+# env.config["vehicles_count"] = 10
+# env.config["vehicles_density"] = 1.3
+# env.config["policy_frequency"] = 2
+# env.config["simulation_frequency"] = 10
+# env.reset()
 
 
 def weighSync(target_model, source_model, tau=0.001):
@@ -266,6 +267,13 @@ class DQN(nn.Module):
         avg_reward_list = []
         epoch_reward = 0
 
+        # directory
+        save_dir = "intersection_prioritized_"+self.timestamp
+        try:
+            os.makedirs(save_dir)
+        except OSError:
+            pass
+
         for epoch in tqdm(range(int(num_epochs))):
             done = False
             state = env.reset()
@@ -371,21 +379,16 @@ class DQN(nn.Module):
                 )
 
                 epoch_reward = 0
-                # create a new directory for saving
-                try:
-                    os.makedirs("highway_prioritized_"+self.timestamp)
-                except OSError:
-                    pass
-                np.save(self.timestamp + "/double_dqn_count.npy", count_list)
-                np.save(self.timestamp + "/double_dqn_loss.npy", loss_list)
+                np.save(save_dir + "/double_dqn_count.npy", count_list)
+                np.save(save_dir + "/double_dqn_loss.npy", loss_list)
                 np.save(
-                    self.timestamp + "/double_dqn_total_reward.npy", total_reward_list
+                    save_dir + "/double_dqn_total_reward.npy", total_reward_list
                 )
                 np.save(
-                    self.timestamp + "/double_dqn_avg_reward.npy", avg_reward_list
+                    save_dir + "/double_dqn_avg_reward.npy", avg_reward_list
                 )
                 torch.save(
-                    self.estimate_net.state_dict(), self.timestamp + "/double_dqn.pkl"
+                    self.estimate_net.state_dict(), save_dir + "/double_dqn.pkl"
                 )
 
         env.close()
@@ -418,8 +421,8 @@ if __name__ == "__main__":
 
     dqn_object = DQN(
         env,
-        state_dim=25,
-        action_dim=5,
+        state_dim=105,
+        action_dim=3,
         lr=0.001,
         gamma=0.99,
         buffer_size=1000,
@@ -430,13 +433,13 @@ if __name__ == "__main__":
     # Train the policy
     iterations = 4000
     avg_loss, total_reward, count, avg_reward_list = dqn_object.train(iterations)
-    np.save(time_string+"double_dqn_count.npy", count)
-    np.save(time_string+"double_dqn_loss.npy", avg_loss)
-    np.save(time_string+"double_dqn_total_reward.npy", total_reward)
-    np.save(time_string+"double_dqn_average_reward.npy", avg_reward_list)
+    # np.save(time_string+"double_dqn_count.npy", count)
+    # np.save(time_string+"double_dqn_loss.npy", avg_loss)
+    # np.save(time_string+"double_dqn_total_reward.npy", total_reward)
+    # np.save(time_string+"double_dqn_average_reward.npy", avg_reward_list)
 
-    # save the dqn network
-    torch.save(dqn_object.estimate_net.state_dict(), "double_dqn.pkl")
+    # # save the dqn network
+    # torch.save(dqn_object.estimate_net.state_dict(), "double_dqn.pkl")
 
     # plot
     # plt.figure(figsize=(10, 6))
