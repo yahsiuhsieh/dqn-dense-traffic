@@ -16,7 +16,13 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
 # Define the environment
-env = gym.make("intersection-v0")
+env = gym.make("highway-v0")
+env.config["lanes_count"] = 4
+env.config["duration"] = 100
+env.config["vehicles_count"] = 10
+env.config["vehicles_density"] = 1.3
+env.config["policy_frequency"] = 2
+env.config["simulation_frequency"] = 10
 env.reset()
 
 
@@ -92,22 +98,9 @@ class Net(nn.Module):
         """
         super(Net, self).__init__()
 
-        self.cnn = nn.Sequential(
-            # a 2D convolutional layer
-            nn.Conv2d(1, 4, kernel_size=3, padding=1),
-            nn.BatchNorm2d(4),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=1),
-            # another 2D convolutional layer
-            nn.Conv2d(4, 4, kernel_size=3, padding=1),
-            nn.BatchNorm2d(4),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=1),
-        )
-
-        hidden_nodes1 = 1024
-        hidden_nodes2 = 512
-        self.fc1 = nn.Linear(4 * 3 * 11, hidden_nodes1)
+        hidden_nodes1 = 512
+        hidden_nodes2 = 256
+        self.fc1 = nn.Linear(state_dim, hidden_nodes1)
         self.fc2 = nn.Linear(hidden_nodes1, hidden_nodes2)
         self.fc3 = nn.Linear(hidden_nodes2, action_dim)
 
@@ -118,16 +111,15 @@ class Net(nn.Module):
         : param state: ndarray, the state of the environment
         """
         x = state
+        # print(x.shape)
 
-        x = self.cnn(x)
-        x = x.view(x.size(0), -1)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         out = self.fc3(x)
         return out
 
 
-class DOUBLEDQN_CNN(nn.Module):
+class DOUBLEDQN(nn.Module):
     def __init__(
         self,
         env,
@@ -146,7 +138,7 @@ class DOUBLEDQN_CNN(nn.Module):
         : param gamma: float, discount factor
         : param batch_size: int, batch size for training
         """
-        super(DOUBLEDQN_CNN, self).__init__()
+        super(DOUBLEDQN, self).__init__()
 
         self.env = env
         self.env.reset()
@@ -179,9 +171,7 @@ class DOUBLEDQN_CNN(nn.Module):
         : param epsilon: float, between 0 and 1
         : return: ndarray, chosen action
         """
-        state = (
-            torch.FloatTensor(state).to(device).reshape(-1, 1, 7, self.state_dim // 7)
-        )
+        state = torch.FloatTensor(state).to(device).reshape(-1)  # get a 1D array
         if np.random.randn() <= epsilon:
             action_value = self.estimate_net(state)
             action = torch.argmax(action_value).item()
@@ -204,6 +194,7 @@ class DOUBLEDQN_CNN(nn.Module):
         for epoch in range(int(num_epochs)):
             done = False
             state = self.env.reset()
+            # print(state.shape)
             avg_loss = 0
             step = 0
             while not done:
@@ -226,24 +217,28 @@ class DOUBLEDQN_CNN(nn.Module):
                 exp_batch = self.ReplayBuffer.buffer_sample(self.batch_size)
 
                 # extract batch data
-                state_batch = torch.FloatTensor([exp["state"] for exp in exp_batch])
-                action_batch = torch.LongTensor([exp["action"] for exp in exp_batch])
-                reward_batch = torch.FloatTensor([exp["reward"] for exp in exp_batch])
+                state_batch = torch.FloatTensor([exp["state"] for exp in exp_batch]).to(
+                    device
+                )
+                action_batch = torch.LongTensor(
+                    [exp["action"] for exp in exp_batch]
+                ).to(device)
+                reward_batch = torch.FloatTensor(
+                    [exp["reward"] for exp in exp_batch]
+                ).to(device)
                 state_next_batch = torch.FloatTensor(
                     [exp["state_next"] for exp in exp_batch]
-                )
-                done_batch = torch.FloatTensor([1 - exp["done"] for exp in exp_batch])
+                ).to(device)
+                done_batch = torch.FloatTensor(
+                    [1 - exp["done"] for exp in exp_batch]
+                ).to(device)
 
                 # reshape
-                state_batch = state_batch.to(device).reshape(
-                    self.batch_size, 1, 7, self.state_dim // 7
-                )
-                action_batch = action_batch.to(device).reshape(self.batch_size, -1)
-                reward_batch = reward_batch.to(device).reshape(self.batch_size, -1)
-                state_next_batch = state_next_batch.to(device).reshape(
-                    self.batch_size, 1, 7, self.state_dim // 7
-                )
-                done_batch = done_batch.to(device).reshape(self.batch_size, -1)
+                state_batch = state_batch.reshape(self.batch_size, -1)
+                action_batch = action_batch.reshape(self.batch_size, -1)
+                reward_batch = reward_batch.reshape(self.batch_size, -1)
+                state_next_batch = state_next_batch.reshape(self.batch_size, -1)
+                done_batch = done_batch.reshape(self.batch_size, -1)
 
                 # get estimate Q value
                 estimate_Q = self.estimate_net(state_batch).gather(1, action_batch)
@@ -292,16 +287,10 @@ class DOUBLEDQN_CNN(nn.Module):
                     os.makedirs(self.timestamp)
                 except OSError:
                     pass
-                np.save(
-                    self.timestamp + "/double_dqn_cnn_intersect_loss.npy", loss_list
-                )
-                np.save(
-                    self.timestamp + "/double_dqn_cnn_intersect_avg_reward.npy",
-                    avg_reward_list,
-                )
+                np.save(self.timestamp + "/double_dqn_loss.npy", loss_list)
+                np.save(self.timestamp + "/double_dqn_avg_reward.npy", avg_reward_list)
                 torch.save(
-                    self.estimate_net.state_dict(),
-                    self.timestamp + "/double_dqn_cnn_intersect.pkl",
+                    self.estimate_net.state_dict(), self.timestamp + "/double_dqn.pkl"
                 )
 
         self.env.close()
@@ -334,10 +323,10 @@ if __name__ == "__main__":
         "%m%d_%H_%M", named_tuple
     )  # have a folder of "date+time ex: 1209_20_36 -> December 12th, 20:36"
 
-    double_dqn_cnn_object = DOUBLEDQN_CNN(
+    double_dqn_object = DOUBLEDQN(
         env,
-        state_dim=105,
-        action_dim=3,
+        state_dim=25,
+        action_dim=5,
         lr=0.001,
         gamma=0.99,
         batch_size=64,
@@ -345,15 +334,14 @@ if __name__ == "__main__":
     )
 
     # Train the policy
-    iterations = 4000
-    avg_loss, avg_reward_list = double_dqn_cnn_object.train(iterations)
-    np.save(time_string + "/double_dqn_cnn_intersect_loss.npy", avg_loss)
-    np.save(time_string + "/double_dqn_cnn_intersect_avg_reward.npy", avg_reward_list)
+    iterations = 1
+    avg_loss, avg_reward_list = double_dqn_object.train(iterations)
+    np.save(time_string + "/double_dqn_loss.npy", avg_loss)
+    np.save(time_string + "/double_dqn_avg_reward.npy", avg_reward_list)
 
     # save the dqn network
     torch.save(
-        double_dqn_cnn_object.estimate_net.state_dict(),
-        time_string + "/double_dqn_cnn_intersect.pkl",
+        double_dqn_object.estimate_net.state_dict(), time_string + "/double_dqn.pkl"
     )
 
     # plot
@@ -372,5 +360,5 @@ if __name__ == "__main__":
     # plt.title("Double DQN Training Reward")
     # plt.xlabel("*40 epochs")
     # plt.ylabel("reward")
-    # plt.savefig(time_string + "/double_dqn_cnn_train_reward.png", dpi=150)
+    # plt.savefig(time_string + "/double_dqn_train_reward.png", dpi=150)
     # plt.show()
