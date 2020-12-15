@@ -53,6 +53,21 @@ cd Highway
 python double_dqn.py
 ```
 
+### Configure the Environment
+
+We configured the highway environment in the following way, you can also read the [documentation online](https://highway-env.readthedocs.io/en/latest/quickstart.html#configuring-an-environment) for other settings.
+
+```python
+env = gym.make("highway-v0")
+env.config["lanes_count"] = 4
+env.config["duration"] = 100
+env.config["vehicles_count"] = 10
+env.config["vehicles_density"] = 1.3
+env.config["policy_frequency"] = 2
+env.config["simulation_frequency"] = 10
+env.reset()
+```
+
 ## Results
 
 <p align="center">
