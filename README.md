@@ -45,7 +45,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 ## How to Run
 
-There are 4 methods you can try, namely dueling DQN, double DQN, double DQN with cnn, and double DQN with prioritized replay buffer, with corresponding file name.
+There are 4 methods you can try, namely *dueling DQN*, *double DQN*, *double DQN with cnn*, and *double DQN with prioritized replay buffer*, with corresponding file name.
 
 ex. if you want to try double DQN in highway environment, just do
 ```
