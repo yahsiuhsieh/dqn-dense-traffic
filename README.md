@@ -39,10 +39,6 @@ These instructions will get you a copy of the project up and running on your loc
 │   ├── double_dqn_cnn.py         # Double DQN with CNN architecture
 │   └── double_dqn_prioritized.py # Double DQN with Prioritized Buffer
 ├── Intersection                  # Scripts for intersection environment
-│   ├── dueling_dqn.py            # Dueling DQN
-│   ├── double_dqn.py             # Double DQN
-│   ├── double_dqn_cnn.py         # Double DQN with CNN architecture
-│   └── double_dqn_prioritized.py # Double DQN with Prioritized Buffer
 ├── doc                           # Detailed info
 └── README.md
 ```
