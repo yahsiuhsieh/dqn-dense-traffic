@@ -3,7 +3,7 @@
 Deep reinforcement learning techniques apply to autonomous driving problems.
 
 <p align="center">
-  <img width="640" height="160" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.gif">
+  <img width="640" height="160" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.gif" alt>
   <em>The highway environment.</em>
 </p>
 
@@ -57,6 +57,6 @@ The command above run the double DQN algorithm in highway environment.
 ## Results
 
 <p align="center">
-  <img width="900" height="600" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.png">
+  <img width="900" height="600" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.png" alt>
   <em>Average training reward in highway environment.</em>
 </p>
