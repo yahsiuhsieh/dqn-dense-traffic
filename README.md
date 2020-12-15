@@ -57,6 +57,6 @@ The command above run the double DQN algorithm in highway environment.
 ## Results
 
 <p align="center">
-  <img width="640" height="250" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.png">
+  <img width="900" height="600" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.png">
   <figcaption>{{Average training reward in highway environment.}}</figcaption>
 </p>
