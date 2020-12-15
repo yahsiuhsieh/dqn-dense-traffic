@@ -4,6 +4,7 @@ Deep reinforcement learning techniques apply to autonomous driving problems.
 
 <p align="center">
   <img width="640" height="160" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.gif">
+  <figcaption>{{The highway environment.}}</figcaption>
 </p>
 
 ## Getting Started
@@ -46,7 +47,16 @@ These instructions will get you a copy of the project up and running on your loc
 
 ## How to Run
 
+```
+cd Highway
+python double_dqn.py
+```
+
+The command above run the double DQN algorithm in highway environment.
 
 ## Results
 
-Please refer to the [notebook](https://github.com/arthur960304/european_soccer/blob/main/european_soccer.ipynb) to see the result.
+<p align="center">
+  <img width="640" height="250" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.png">
+  <figcaption>{{Average training reward in highway environment.}}</figcaption>
+</p>
