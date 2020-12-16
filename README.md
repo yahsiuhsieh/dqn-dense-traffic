@@ -3,7 +3,7 @@
 Deep reinforcement learning techniques apply to autonomous driving problems.
 
 <p align="center">
-  <img width="300" height="300" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/intersection.gif"/>
+  <img width="350" height="350" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/intersection.gif"/>
 </p>
 <p align="center">
   <em>Agent running in the intersection environment.</em>
