@@ -3,10 +3,10 @@
 Deep reinforcement learning techniques apply to autonomous driving problems.
 
 <p align="center">
-  <img width="640" height="160" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.gif"/>
+  <img width="400" height="400" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/intersection.gif"/>
 </p>
 <p align="center">
-  <em>The highway environment.</em>
+  <em>Agent running in the intersection environment.</em>
 </p>
 
 ## Getting Started
@@ -71,10 +71,10 @@ env.reset()
 ## Results
 
 <p align="center">
-  <img width="300" height="300" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/intersection.gif"/>
+  <img width="640" height="160" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.gif"/>
 </p>
 <p align="center">
-  <em>Agent running in the intersection environment.</em>
+  <em>Agent running in the highway environment.</em>
 </p>
 
 <p align="center">
