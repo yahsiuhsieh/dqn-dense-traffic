@@ -1,70 +1,35 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Dec 13 00:08:23 2020
+
+@author: coldhenry
+"""
 import os
 import copy
-import random
 import time
+import random
 import numpy as np
 import matplotlib.pyplot as plt
-from collections import deque
-from tqdm import tqdm
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from tqdm import tqdm
 import gym
 import highway_env
-import pybullet
-import pybulletgym.envs
-import pprint
 
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 device = torch.device("cpu")
 print(device)
 
-
 # Define the environment
-# gym.envs.register(
-#     id='highway-v0',
-#     entry_point='highway_env.envs:HighwayEnv',
-# )
-
-env = gym.make("highway-v0")
-#print(env.action_space)
-#pprint.pprint(env.config)
-env.config["lanes_count"] = 4
-env.config["duration"] = 100
-env.config["vehicles_count"] = 10
-env.config["vehicles_density"] = 1.3
-env.config["policy_frequency"] = 2
-env.config["simulation_frequency"] = 10
+env = gym.make("intersection-v0")
 env.reset()
 
 
-def weighSync(target_model, source_model, tau=0.001):
-    """
-    A function to soft update target networks
-
-    : param target_model: torch object, target network
-    : param source_model: torch object, source network
-    : param tau: float, update factor
-    """
-    for param, target_param in zip(
-        source_model.parameters(), target_model.parameters()
-    ):
-        target_param.data.copy_(tau * param.data + (1 - tau) * target_param.data)
-
-
-class Prioritized_Replay:
-    def __init__(
-        self,
-        buffer_size,
-        init_length,
-        state_dim,
-        action_dim,
-        est_Net,
-        tar_Net,
-        gamma,
-    ):
+class Replay:
+    def __init__(self, buffer_size, init_length, state_dim, action_dim, env):
         """
         A function to initialize the replay buffer.
 
@@ -77,23 +42,21 @@ class Prioritized_Replay:
         self.init_length = init_length
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.gamma = gamma
+        self.env = env
 
-        self.priority = deque(maxlen=buffer_size)
         self._storage = []
-        self._init_buffer(init_length, est_Net, tar_Net)
+        self._init_buffer(init_length)
 
-    def _init_buffer(self, n, est_Net, tar_Net):
+    def _init_buffer(self, n):
         """
         Init buffer with n samples with state-transitions taken from random actions
 
         : param n: int, number of samples
         """
-        state = env.reset()
-        print(state.shape)
+        state = self.env.reset()
         for _ in range(n):
-            action = env.action_space.sample()
-            state_next, reward, done, _ = env.step(action)
+            action = self.env.action_space.sample()
+            state_next, reward, done, _ = self.env.step(action)
             exp = {
                 "state": state,
                 "action": action,
@@ -101,12 +64,11 @@ class Prioritized_Replay:
                 "state_next": state_next,
                 "done": done,
             }
-            self.prioritize(est_Net, tar_Net, exp, alpha=0.6)
             self._storage.append(exp)
             state = state_next
 
             if done:
-                state = env.reset()
+                state = self.env.reset()
                 done = False
 
     def buffer_add(self, exp):
@@ -118,24 +80,6 @@ class Prioritized_Replay:
         self._storage.append(exp)
         if len(self._storage) > self.buffer_size:
             self._storage.pop(0)
-
-    def prioritize(self, est_Net, tar_Net, exp, alpha=0.6):
-
-        state = torch.FloatTensor(exp["state"]).to(device).reshape(-1)
-
-        q = est_Net(state)[exp["action"]].detach().cpu().numpy()
-        q_next = exp["reward"] + self.gamma * torch.max(est_Net(state).detach())
-        # TD error
-        p = (np.abs(q_next.cpu().numpy() - q) + (np.e ** -10)) ** alpha
-        self.priority.append(p.item())
-
-    def get_prioritized_batch(self, N):
-        prob = self.priority / np.sum(self.priority)
-        sample_idxes = random.choices(range(len(prob)), k=N, weights=prob)
-        importance = (1 / prob) * (1 / len(self.priority))
-        sampled_importance = np.array(importance)[sample_idxes]
-        sampled_batch = np.array(self._storage)[sample_idxes]
-        return sampled_batch.tolist(), sampled_importance
 
     def buffer_sample(self, N):
         """
@@ -156,11 +100,11 @@ class Net(nn.Module):
         """
         super(Net, self).__init__()
 
-        hidden_nodes1 = 512
-        hidden_nodes2 = 256
+        hidden_nodes1 = 1024
+        hidden_nodes2 = 512
         self.fc1 = nn.Linear(state_dim, hidden_nodes1)
         self.fc2 = nn.Linear(hidden_nodes1, hidden_nodes2)
-        self.fc3 = nn.Linear(hidden_nodes2, action_dim)
+        self.fc3 = nn.Linear(hidden_nodes2, action_dim + 1)
 
     def forward(self, state):
         """
@@ -177,7 +121,7 @@ class Net(nn.Module):
         return out
 
 
-class DQN(nn.Module):
+class DUELDQN(nn.Module):
     def __init__(
         self,
         env,
@@ -185,11 +129,7 @@ class DQN(nn.Module):
         action_dim,
         lr=0.001,
         gamma=0.99,
-        buffer_size=1000,
-        batch_size=50,
-        beta=1,
-        beta_decay=0.995,
-        beta_min=0.01,
+        batch_size=5,
         timestamp="",
     ):
         """
@@ -200,10 +140,12 @@ class DQN(nn.Module):
         : param gamma: float, discount factor
         : param batch_size: int, batch size for training
         """
-        super(DQN, self).__init__()
+        super(DUELDQN, self).__init__()
 
+        self.env = env
+        self.env.reset()
         self.timestamp = timestamp
-        
+
         self.test_env = copy.deepcopy(env)  # for evaluation purpose
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -213,23 +155,9 @@ class DQN(nn.Module):
 
         self.target_net = Net(self.state_dim, self.action_dim).to(device)
         self.estimate_net = Net(self.state_dim, self.action_dim).to(device)
-        self.optimizer = torch.optim.Adam(self.estimate_net.parameters(), lr=lr)
+        self.ReplayBuffer = Replay(1000, 100, self.state_dim, self.action_dim, env)
 
-        self.ReplayBuffer = Prioritized_Replay(
-            buffer_size,
-            100,
-            self.state_dim,
-            self.action_dim,
-            self.estimate_net,
-            self.target_net,
-            gamma,
-        )
-        self.priority = self.ReplayBuffer.priority
-        # NOTE: right here beta is equal to (1-beta) in most of website articles, notation difference
-        # start from 1 and decay
-        self.beta = beta
-        self.beta_decay = beta_decay
-        self.beta_min = beta_min
+        self.optimizer = torch.optim.Adam(self.estimate_net.parameters(), lr=lr)
 
     def update_target_networks(self):
         """
@@ -246,13 +174,28 @@ class DQN(nn.Module):
         : return: ndarray, chosen action
         """
         state = torch.FloatTensor(state).to(device).reshape(-1)  # get a 1D array
-        # print(state.shape)
+
         if np.random.randn() <= epsilon:
             action_value = self.estimate_net(state)
+            action_value = action_value[:-1]
             action = torch.argmax(action_value).item()
         else:
             action = np.random.randint(0, self.action_dim)
         return action
+
+    def calculate_duelling_q_values(self, duelling_q_network_output):
+        """
+        Calculate the Q values using the duelling network architecture. This is equation (9) in the paper.
+
+        :param duelling_q_network_output: tensor, output of duelling q network
+        :return: Q values
+        """
+        state_value = duelling_q_network_output[:, -1]
+        avg_advantage = torch.mean(duelling_q_network_output[:, :-1], dim=1)
+        q_values = state_value.unsqueeze(1) + (
+            duelling_q_network_output[:, :-1] - avg_advantage.unsqueeze(1)
+        )
+        return q_values
 
     def train(self, num_epochs):
         """
@@ -260,22 +203,24 @@ class DQN(nn.Module):
 
         :param num_epochs: int, number of epochs to train the policy for
         """
-        count_list = []
         loss_list = []
-        total_reward_list = []
         avg_reward_list = []
         epoch_reward = 0
+        save_dir = "dueling_intersection_"+self.timestamp
+        try:
+            os.makedirs(save_dir)
+        except OSError:
+            pass
 
         for epoch in tqdm(range(int(num_epochs))):
             done = False
-            state = env.reset()
-            
-            avg_loss = 0
+            state = self.env.reset()
             step = 0
+            avg_loss = 0
             while not done:
                 step += 1
                 action = self.choose_action(state)
-                state_next, reward, done, _ = env.step(action)
+                state_next, reward, done, _ = self.env.step(action)
                 # self.env.render()
                 # store experience to replay memory
                 exp = {
@@ -288,15 +233,8 @@ class DQN(nn.Module):
                 self.ReplayBuffer.buffer_add(exp)
                 state = state_next
 
-                # importance weighting
-                if self.beta > self.beta_min:
-                    self.beta *= self.beta_decay
-
                 # sample random batch from replay memory
-                exp_batch, importance = self.ReplayBuffer.get_prioritized_batch(
-                    self.batch_size
-                )
-                importance = torch.FloatTensor(importance ** (1 - self.beta)).to(device)
+                exp_batch = self.ReplayBuffer.buffer_sample(self.batch_size)
 
                 # extract batch data
                 state_batch = torch.FloatTensor([exp["state"] for exp in exp_batch]).to(
@@ -323,19 +261,22 @@ class DQN(nn.Module):
                 done_batch = done_batch.reshape(self.batch_size, -1)
 
                 # get estimate Q value
-                estimate_Q = self.estimate_net(state_batch).gather(1, action_batch)
+                estimate_net_output = self.estimate_net(state_batch)
+                estimate_Q = self.calculate_duelling_q_values(estimate_net_output)
+                estimate_Q = estimate_Q.gather(1, action_batch)
 
                 # get target Q value
-                max_action_idx = self.estimate_net(state_next_batch).detach().argmax(1)
-                target_Q = reward_batch + done_batch * self.gamma * self.target_net(
-                    state_next_batch
-                ).gather(1, max_action_idx.unsqueeze(1))
+                max_action_idx = (
+                    self.estimate_net(state_next_batch)[:, :-1].detach().argmax(1)
+                )
+                target_net_output = self.target_net(state_next_batch)
+                target_Q = self.calculate_duelling_q_values(target_net_output).gather(
+                    1, max_action_idx.unsqueeze(1)
+                )
+                target_Q = reward_batch + done_batch * self.gamma * target_Q
 
                 # compute mse loss
-                # loss = F.mse_loss(estimate_Q, target_Q)
-                loss = torch.mean(
-                    torch.multiply(torch.square(estimate_Q - target_Q), importance)
-                )
+                loss = F.mse_loss(estimate_Q, target_Q)
                 avg_loss += loss.item()
 
                 # update network
@@ -345,14 +286,11 @@ class DQN(nn.Module):
 
                 # update target network
                 if self.learn_step_counter % 10 == 0:
-                    # self.update_target_networks()
                     self.target_net.load_state_dict(self.estimate_net.state_dict())
-
                 self.learn_step_counter += 1
-                
 
-            total_reward, count = self.eval()
-            epoch_reward += total_reward
+            reward, count = self.eval()
+            epoch_reward += reward
 
             # save
             period = 40
@@ -360,8 +298,6 @@ class DQN(nn.Module):
                 # log
                 avg_loss /= step
                 epoch_reward /= period
-                count_list.append(count)
-                total_reward_list.append(total_reward)
                 avg_reward_list.append(epoch_reward)
                 loss_list.append(avg_loss)
 
@@ -373,24 +309,15 @@ class DQN(nn.Module):
 
                 epoch_reward = 0
                 # create a new directory for saving
-                try:
-                    os.makedirs("highway_prioritized_"+self.timestamp)
-                except OSError:
-                    pass
-                np.save(self.timestamp + "/double_dqn_count.npy", count_list)
-                np.save(self.timestamp + "/double_dqn_loss.npy", loss_list)
-                np.save(
-                    self.timestamp + "/double_dqn_total_reward.npy", total_reward_list
-                )
-                np.save(
-                    self.timestamp + "/double_dqn_avg_reward.npy", avg_reward_list
-                )
+                
+                np.save(save_dir + "/dueling_dqn_loss.npy", loss_list)
+                np.save(save_dir + "/dueling_dqn_avg_reward.npy", avg_reward_list)
                 torch.save(
-                    self.estimate_net.state_dict(), self.timestamp + "/double_dqn.pkl"
+                    self.estimate_net.state_dict(), save_dir + "/dueling_dqn.pkl"
                 )
 
-        env.close()
-        return loss_list, total_reward_list, count_list, avg_reward_list
+        self.env.close()
+        return loss_list, avg_reward_list
 
     def eval(self):
         """
@@ -415,29 +342,30 @@ if __name__ == "__main__":
 
     # timestamp for saving
     named_tuple = time.localtime()  # get struct_time
-    time_string = time.strftime("%m%d_%H_%M", named_tuple)
+    time_string = time.strftime(
+        "%m%d_%H_%M", named_tuple
+    )  # have a folder of "date+time ex: 1209_20_36 -> December 12th, 20:36"
 
-    dqn_object = DQN(
+    duel_dqn_object = DUELDQN(
         env,
-        state_dim=25,
-        action_dim=5,
+        state_dim=105,
+        action_dim=3,
         lr=0.001,
         gamma=0.99,
-        buffer_size=1000,
         batch_size=64,
         timestamp=time_string,
     )
 
     # Train the policy
     iterations = 4000
-    avg_loss, total_reward, count, avg_reward_list = dqn_object.train(iterations)
-    np.save(time_string+"double_dqn_count.npy", count)
-    np.save(time_string+"double_dqn_loss.npy", avg_loss)
-    np.save(time_string+"double_dqn_total_reward.npy", total_reward)
-    np.save(time_string+"double_dqn_average_reward.npy", avg_reward_list)
+    avg_loss, avg_reward_list = duel_dqn_object.train(iterations)
+    # np.save(time_string + "/dueling_dqn_loss.npy", avg_loss)
+    # np.save(time_string + "/dueling_dqn_avg_reward.npy", avg_reward_list)
 
-    # save the dqn network
-    torch.save(dqn_object.estimate_net.state_dict(), "double_dqn.pkl")
+    # # save the dqn network
+    # torch.save(
+    #     duel_dqn_object.estimate_net.state_dict(), time_string + "/dueling_dqn.pkl"
+    # )
 
     # plot
     # plt.figure(figsize=(10, 6))
@@ -449,11 +377,11 @@ if __name__ == "__main__":
     # plt.savefig("double_dqn_loss.png", dpi=150)
     # plt.show()
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(avg_reward_list)
-    plt.grid()
-    plt.title("Double DQN Training Reward")
-    plt.xlabel("*40 epochs")
-    plt.ylabel("reward")
-    plt.savefig(time_string + "/double_dqn_train_reward.png", dpi=150)
-    plt.show()
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(avg_reward_list)
+    # plt.grid()
+    # plt.title("Dueling DQN Training Reward")
+    # plt.xlabel("*40 epochs")
+    # plt.ylabel("reward")
+    # plt.savefig(time_string + "/dueling_dqn_train_reward.png", dpi=150)
+    # plt.show()

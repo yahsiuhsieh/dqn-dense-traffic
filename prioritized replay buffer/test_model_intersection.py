@@ -22,8 +22,8 @@ class Net(nn.Module):
         """
         super(Net, self).__init__()
 
-        hidden_nodes1 = 512
-        hidden_nodes2 = 256
+        hidden_nodes1 = 1024
+        hidden_nodes2 = 512
         self.fc1 = nn.Linear(state_dim, hidden_nodes1)
         self.fc2 = nn.Linear(hidden_nodes1, hidden_nodes2)
         self.fc3 = nn.Linear(hidden_nodes2, action_dim)
@@ -51,6 +51,10 @@ def choose_action(net, state):
     """
     state = torch.FloatTensor(state).reshape(-1)  # get a 1D array
     action_value = net(state)
+    
+    #for dueling
+    #action_value = action_value[:-1]
+    
     action = torch.argmax(action_value).item()
     return action
 
@@ -75,7 +79,7 @@ if __name__ == "__main__":
 
     # load the model
     net = Net(105, 3) 
-    net.load_state_dict(torch.load("double_dqn.pkl"))
+    net.load_state_dict(torch.load("double_dqn_pr.pkl"))
 
     success = 0
     num_epochs = 100
@@ -85,12 +89,17 @@ if __name__ == "__main__":
         step = 0
         while not done:
             step += 1
-            if step == env.config["duration"]:
-                #print("success")
-                success += 1
             action = choose_action(net, state)
-            state, reward, done, _ = env.step(action)
-            env.render()
+            state, reward, done, info = env.step(action)
+            #print(info)
+            #env.render()
+        if not info['crashed']:
+            #print("success")
+            success += 1
+        # print("step:", step)
+        # if step == env.config["duration"]:
+        #     print("success")
+        #     success += 1
     print("success rate: {}%".format(success))
 
     env.close()

@@ -18,7 +18,7 @@ import pybulletgym.envs
 import pprint
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#device = torch.device("cpu")
+# device = torch.device("cpu")
 print(device)
 
 
@@ -32,13 +32,17 @@ env = gym.make("intersection-v0")
 print(env.action_space)
 pprint.pprint(env.config)
 
-# env.config["lanes_count"] = 4
-# env.config["duration"] = 100
-# env.config["vehicles_count"] = 10
-# env.config["vehicles_density"] = 1.3
-# env.config["policy_frequency"] = 2
-# env.config["simulation_frequency"] = 10
-# env.reset()
+# directory
+# timestamp for saving
+named_tuple = time.localtime()  # get struct_time
+time_string = time.strftime("%m%d_%H_%M", named_tuple)
+save_dir = "double_prioritized_intersection_" + time_string
+try:
+    os.makedirs(save_dir)
+except OSError:
+    pass
+
+
 
 
 def weighSync(target_model, source_model, tau=0.001):
@@ -157,8 +161,8 @@ class Net(nn.Module):
         """
         super(Net, self).__init__()
 
-        hidden_nodes1 = 512
-        hidden_nodes2 = 256
+        hidden_nodes1 = 1024
+        hidden_nodes2 = 512
         self.fc1 = nn.Linear(state_dim, hidden_nodes1)
         self.fc2 = nn.Linear(hidden_nodes1, hidden_nodes2)
         self.fc3 = nn.Linear(hidden_nodes2, action_dim)
@@ -204,7 +208,7 @@ class DQN(nn.Module):
         super(DQN, self).__init__()
 
         self.timestamp = timestamp
-        
+
         self.test_env = copy.deepcopy(env)  # for evaluation purpose
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -267,17 +271,10 @@ class DQN(nn.Module):
         avg_reward_list = []
         epoch_reward = 0
 
-        # directory
-        save_dir = "intersection_prioritized_"+self.timestamp
-        try:
-            os.makedirs(save_dir)
-        except OSError:
-            pass
-
         for epoch in tqdm(range(int(num_epochs))):
             done = False
             state = env.reset()
-            
+
             avg_loss = 0
             step = 0
             while not done:
@@ -351,7 +348,7 @@ class DQN(nn.Module):
                 self.optimizer.step()
 
                 # update target network
-                if self.learn_step_counter % 100 == 0:
+                if self.learn_step_counter % 10 == 0:
                     # self.update_target_networks()
                     self.target_net.load_state_dict(self.estimate_net.state_dict())
 
@@ -381,15 +378,9 @@ class DQN(nn.Module):
                 epoch_reward = 0
                 np.save(save_dir + "/double_dqn_count.npy", count_list)
                 np.save(save_dir + "/double_dqn_loss.npy", loss_list)
-                np.save(
-                    save_dir + "/double_dqn_total_reward.npy", total_reward_list
-                )
-                np.save(
-                    save_dir + "/double_dqn_avg_reward.npy", avg_reward_list
-                )
-                torch.save(
-                    self.estimate_net.state_dict(), save_dir + "/double_dqn.pkl"
-                )
+                np.save(save_dir + "/double_dqn_total_reward.npy", total_reward_list)
+                np.save(save_dir + "/double_dqn_avg_reward.npy", avg_reward_list)
+                torch.save(self.estimate_net.state_dict(), save_dir + "/double_dqn.pkl")
 
         env.close()
         return loss_list, total_reward_list, count_list, avg_reward_list
@@ -414,10 +405,6 @@ class DQN(nn.Module):
 
 
 if __name__ == "__main__":
-
-    # timestamp for saving
-    named_tuple = time.localtime()  # get struct_time
-    time_string = time.strftime("%m%d_%H_%M", named_tuple)
 
     dqn_object = DQN(
         env,
@@ -451,11 +438,11 @@ if __name__ == "__main__":
     # plt.savefig("double_dqn_loss.png", dpi=150)
     # plt.show()
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(avg_reward_list)
-    plt.grid()
-    plt.title("Double DQN Training Reward")
-    plt.xlabel("*40 epochs")
-    plt.ylabel("reward")
-    plt.savefig(time_string + "/double_dqn_train_reward.png", dpi=150)
-    plt.show()
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(avg_reward_list)
+    # plt.grid()
+    # plt.title("Double DQN Training Reward")
+    # plt.xlabel("*40 epochs")
+    # plt.ylabel("reward")
+    # plt.savefig(save_dir + "/double_dqn_train_reward.png", dpi=150)
+    # plt.show()

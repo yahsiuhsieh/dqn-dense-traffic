@@ -11,7 +11,7 @@ from tqdm import tqdm
 # configure env
 env = gym.make("highway-v0")
 env.config["lanes_count"] = 4
-env.config["duration"] = 50
+env.config["duration"] = 100
 env.config["vehicles_count"] = 10
 env.config["vehicles_density"] = 1.3
 env.config["policy_frequency"] = 2
@@ -82,7 +82,7 @@ if __name__ == "__main__":
 
     # load the model
     net = Net(25, 5) # 5 observed vehicles
-    net.load_state_dict(torch.load("double_dqn.pkl"))
+    net.load_state_dict(torch.load("double_dqn_pr.pkl"))
 
     success = 0
     num_epochs = 100
