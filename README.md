@@ -71,7 +71,7 @@ env.reset()
 ## Results
 
 <p align="center">
-  <img width="700" height="175" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.gif"/>
+  <img width="640" height="160" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.gif"/>
 </p>
 <p align="center">
   <em>Agent running in the highway environment.</em>
