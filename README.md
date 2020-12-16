@@ -71,8 +71,15 @@ env.reset()
 ## Results
 
 <p align="center">
+  <img width="450" height="450" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/intersection.gif"/>
+</p>
+<p align="center">
+  <em>Agent running in the intersection environment.</em>
+</p>
+
+<p align="center">
   <img width="900" height="450" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.png"/>
 </p>
 <p align="center">
-  <em>Average training reward in highway environment.</em>
+  <em>Average training reward in the highway environment.</em>
 </p>
