@@ -69,14 +69,14 @@ env.reset()
 ## Results
 
 <p align="center">
-  <img width="640" height="160" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.gif"/>
+  <img width="640" height="160" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.gif"/><br/>
 </p>
 <p align="center">
   <em>Agent running in the highway environment.</em>
 </p>
 
 <p align="center">
-  <img width="900" height="450" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.png"/>
+  <img width="900" height="450" src="https://github.com/arthur960304/dqn-dense-traffic/blob/main/doc/highway.png"/><br/>
 </p>
 <p align="center">
   <em>Average training reward in the highway environment.</em>
