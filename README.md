@@ -81,3 +81,9 @@ env.reset()
 <p align="center">
   <em>Average training reward in the highway environment.</em>
 </p>
+
+
+## Authors
+
+* **Arthur Hsieh** - <i>Initial Works</i> - [arthur960304](https://github.com/arthur960304)
+* **Henry Liu** - <i>Initial Works</i> - [coldhenry](https://github.com/coldhenry)
